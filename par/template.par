@@ -670,6 +670,7 @@ adapt_stepsize_maxcount =
 # Integration method
 # = 0: Implicit Euler
 # = 1: Gear
+# = 2: X-TFC
 solver =
 
 
@@ -707,6 +708,9 @@ gear_eps =
 # the calculation time step.
 gear_escale =
 
+# Maximum allowed change of the timestep
+gear_timestep_max =
+
 # Parameter to decide whether the time step should be adapted in case the
 # Newton-Raphson did not converge optimally. The default is set to true and the
 # stepsize is therefore not changed when the newton-raphson reaches the maximum
@@ -722,3 +726,29 @@ gear_nr_mincount =
 
 # Numerical parameter to control the maximum iterations of the newton-raphson.
 gear_nr_maxcount =
+
+
+### Case solver = 2 ###
+
+# Use or not the least squares sparse solver
+use_sparse_solver =
+
+# Save or not the trained network for posteriori generalization
+save_network =
+
+# Maximum factor for the change of the timestep
+timestep_max =
+
+# Minimum and maximum number of Newton-Raphson iterations
+xtfc_nr_mincount =
+xtfc_nr_maxcount =
+
+# Exit accuracy of the Newton-Raphson algorithm.
+nr_tol =
+
+# Number of neurons
+n_neurons =
+
+# Length time subpartition
+n_x =
+

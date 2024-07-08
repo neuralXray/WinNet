@@ -55,3 +55,5 @@ doc/documentation.html
 *.dvi
 *-converted-to.*
 *test_cases.pdf
+
+winnet

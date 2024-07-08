@@ -186,6 +186,7 @@ use single_zone_vars
 use readini
 use parser_module
 use gear_module, only: init_gear_solver
+use xtfc_module, only: init_xtfc_solver
 implicit none
 integer                               :: i
 real(r_kind)                          :: t_i
@@ -427,6 +428,7 @@ logical                               :: init,converged
 
   ! initialise Gear's method if used
   if(solver==1) call init_gear_solver(Y,t_i,initial_stepsize)
+  if(solver==2) call init_xtfc_solver()
 
 
 end subroutine prepare_simulation
@@ -522,14 +524,16 @@ use single_zone_vars, only: T9,rhob,Ye,Y,Y_p,time,evolution_mode
 use parameter_class,  only: nsetemp_hot,nsetemp_cold,nse_descend_t9start,&
     iwformat,termination_criterion,final_time,final_dens,final_temp, &
     temp_reload_exp_weak_rates, solver, initial_stepsize, heating_density,&
-    heating_mode
+    heating_mode, save_network
 use global_class,   only: ihe4,ineu,ipro,net_size, heating_switch
 use tw_rate_module, only: weak, reload_exp_weak_rates
 use gear_module,    only: init_gear_solver
 use winnse_module,  only: winnse_descend, nse_init
 use hydro_trajectory
+use xtfc_module,    only: open_file
 implicit none
 logical, intent(inout):: init !< Flag that indicates a necessary initialization
+integer               :: unit_number = 0
 
      if (evolution_mode.eq.EM_INIT) then
      ! initalize at the very beginning
@@ -594,7 +598,9 @@ logical, intent(inout):: init !< Flag that indicates a necessary initialization
      case(0) ! when trajectory ends
         if (time.ge.ztime(zsteps)) evolution_mode= EM_TERMINATE
      case(1) ! after a given final time
-        if (time.ge.final_time)    evolution_mode= EM_TERMINATE
+        if (time.ge.final_time) then
+            evolution_mode= EM_TERMINATE
+        end if
      case(2) ! when a lower temperature is hit
         if (T9.le.final_temp)      evolution_mode= EM_TERMINATE
      case(3) ! below a certain density threshold

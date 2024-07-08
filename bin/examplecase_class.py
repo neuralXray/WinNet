@@ -53,10 +53,24 @@ class examplecase(object):
                                "Example_hydrostatic_hydrogen_burning.par",\
                                "Example_xrayburst_schatz.par",\
                                "Example_CO_burning.par",\
+                               "Example_He_burning_3_x-tfc.par",\
+                               "Example_He_burning_3_euler.par",\
+                               "Example_He_burning_3_gear.par",\
+                               "Example_He_burning_6_x-tfc.par",\
+                               "Example_He_burning_6_euler.par",\
+                               "Example_He_burning_6_gear.par",\
+                               "Example_He_burning_13_x-tfc.par",\
+                               "Example_He_burning_13_euler.par",\
+                               "Example_He_burning_13_gear.par",\
+                               "Example_He_burning_18_x-tfc.par",\
+                               "Example_He_burning_18_euler.par",\
+                               "Example_He_burning_18_gear.par",\
                                "Example_type_Ia_meakin.par",\
                                "Example_classical_novae_jose.par",\
                                "Example_AGB_cescutti.par",\
-                               "Example_AGB_nishimura.par"
+                               "Example_AGB_nishimura.par",\
+                               "Example_stiff_chemical_kinetics_rober.par",\
+                               "Example_stiff_chemical_kinetics_belousovzhabotinsky.par"
                                ]
 
 

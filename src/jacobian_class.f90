@@ -812,10 +812,11 @@ subroutine jacobi_init (time, itemp, rho, rkm, Y, Y_p, dYdt, rhs, h, evolution_m
       ! computes matrix-vector product for a sparse matrix in the CSC format:
       call mkl_dcscmv('T',net_size,net_size,1.d0,descra,vals,rows,pt_b,  &
            pt_e,Y,1.d0,rhs)
+      dYdt = dYdt + d*(Y_p-Y)
    elseif(solver==1) then ! Gear's method
       rhs = -(Y - get_predictor_Y())*(l_1/h) + (dYdt - get_predictor_dYdt()/h)
+      dYdt = dYdt + d*(Y_p-Y)
    endif
-   dYdt = dYdt + d*(Y_p-Y)
 
    INFO_EXIT("jacobi_init")
 
