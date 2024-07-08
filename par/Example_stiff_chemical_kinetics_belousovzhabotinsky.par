@@ -1,0 +1,167 @@
+########################################################
+# Template containing all possible parameters together #
+# with a brief description. For more information see   #
+# the documentation at:                                #
+# https://nuc-astro.github.io/WinNet/parameters.html   #
+#                                                      #
+# @date  : 22/08/2023                                  #
+# @author: M. Reichert                                 #
+########################################################
+###############################################################################
+# * 1GK and water density 1.0 g/cm3
+# * use constant thermodynamics, no heating
+# * no neutrino reactions, no weak rates 
+
+##########################
+#   General parameters   #
+##########################
+
+# List of all isotopes used in the network
+# (sunet file)
+net_source = "/home/jax/Documents/TFM/WinNet/data/Example_data/Example_stiff_chemical_kinetics_belousovzhabotinsky/sunet"
+
+
+#######################
+#   Reaclib library   #
+#######################
+
+# The reaclib library containing most of the reaction rates
+reaclib_file  = "/home/jax/Documents/TFM/WinNet/data/Example_data/Example_stiff_chemical_kinetics_belousovzhabotinsky/reaclib.dat"
+
+# Database with the properties of all isotopes
+# (winvn file)
+isotopes_file = "/home/jax/Documents/TFM/WinNet/data/Example_data/Example_stiff_chemical_kinetics_belousovzhabotinsky/winvn"
+
+
+####################################
+# Input for theoretical weak rates #
+####################################
+
+# Flag for theoretical weak rates:
+# =0 : No theoretical weak rates are used
+# =1 : direct tabulation of theoretical weak rates are used
+# =2 : log(ft) theoretical weak rates are used
+iwformat = 0
+
+
+############################
+# Thermodynamic conditions #
+############################
+
+# Is this a trajectory run?
+# Possible options are:
+#   "from_file"  : Take a trajectory file to get temperature and density.
+#   "analytic"   : Take a analytic expression.
+trajectory_mode = "analytic"
+
+# Initial values of thermodynamic variables: 1GK, 1 g/cm3:
+
+# Analytic temperature evolution. The time (in seconds)
+# can be specified with the variable 'x'.
+T9_analytic = 1
+
+# Analytic density evolution. The time (in seconds)
+# can be specified with the variable 'x'.
+rho_analytic = 1
+
+
+#######################
+# Initial composition #
+#######################
+
+# Whether or not to read the initial composition from file
+# (yes/no)
+read_initial_composition = yes
+
+# Path to a file that contains the initial composition.
+seed_file = "/home/jax/Documents/TFM/WinNet/data/Example_data/Example_stiff_chemical_kinetics_belousovzhabotinsky/seed-belousovzhabotinsky.dat"
+
+# Format of the seed file.
+# Possible entries are:
+#    A    : Mass number
+#    Z    : Proton number
+#    N    : Neutron number
+#    Name : Nucleus name
+#    X    : Mass fraction
+#    Y    : Abundance
+#    skip : Dummy column
+# The first rows of the seed file will be skipped if
+# they start with "#" or are blank.
+seed_format = "Name Y"
+
+
+#######################
+# Starting conditions #
+#######################
+
+# Maximum temperature to start at (in GK)
+initemp_hot  = 1
+
+# Minimum temperature to start at (in GK)
+initemp_cold = 1
+
+
+###################################
+# Nuclear statistical equilibrium #
+###################################
+
+# Temperature (in GK) transition from Network -> NSE
+nsetemp_hot = 1
+
+# Temperature (in GK) transition from NSE -> Network
+nsetemp_cold = 1
+
+
+##########################
+# Termination conditions #
+##########################
+
+# When to end the simulation?:
+#    = 0: At the end of the trajectory;
+#    = 1: after final_time is reached;
+#    = 2: after final_temp is reached;
+#    = 3: after final_dens is reached;
+termination_criterion = 1
+
+# Final time in seconds (termination_criterion = 1)
+final_time = 40
+
+
+###########################
+#     Output Settings     #
+###########################
+
+### ASCII output ###
+# Frequency for nuclei that specifically should get tracked. Output will be
+# written to tracked_nuclei.dat
+track_nuclei_every = 1
+
+
+### General path parameters for ASCII and HDF5 ###
+
+# Path to a file containing the nuclei that have to get tracked.
+# This path is only used if track_nuclei_every or h_track_nuclei_every is
+# greater than 0.
+track_nuclei_file = "/home/jax/Documents/TFM/WinNet/data/Example_data/Example_stiff_chemical_kinetics_belousovzhabotinsky/track_nuclei"
+
+
+#######################
+# Numerical parameter #
+#######################
+
+# Initial stepsize to take (in seconds)
+initial_stepsize = 1e-2
+
+# Integration method
+# = 0: Implicit Euler
+# = 1: Gear
+# = 2: X-TFC
+solver = 2
+
+save_network = yes
+use_sparse_solver = yes
+
+
+# Exit accuracy of the Newton-Raphson algorithm.
+nr_tol = 1e-1
+

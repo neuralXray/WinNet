@@ -116,12 +116,18 @@ module parameter_class
   real(r_kind)            :: nse_nr_tol                     !< Tolerance for the NR loop in the NSE calculation
   integer                 :: nse_max_it                     !< Maximum amount of NSE iterations
   integer                 :: nse_solver                     !< Solver for calculating NSE. 0: Newton-Raphson, 1: Powell's hybrid method
+  integer                 :: n_neurons                      !< X-TFC, number of neurons
+  integer                 :: n_x                            !< X-TFC, length time subpartition
   real(r_kind)            :: nsetemp_cold                   !< T [GK] for the nse->network switch
   real(r_kind)            :: nsetemp_hot                    !< T [GK] for the nse<-network switch
   logical                 :: calc_nsep_energy               !< calculate neutron separation energy?
   logical                 :: h_engen_detailed               !< Output the energy per parent nucleus and reaction type
   real(r_kind)            :: heating_frac                   !< use this fraction of nuclear-generated energy for heating
   real(r_kind)            :: heating_density                !< Density at which nuclear heating will be switched on (-1) to always include heating
+  real(r_kind)            :: w_i                            !< weight = unifrnd(w_i, w_f, n_neurons, 1)
+  real(r_kind)            :: w_f                            !< weight = unifrnd(w_i, w_f, n_neurons, 1)
+  real(r_kind)            :: x_i                            !< x = linspace(x_i, x_f, n_x)'
+  real(r_kind)            :: x_f                            !< x = linspace(x_i, x_f, n_x)'
   real(r_kind)            :: nse_descend_t9start            !< high initial temperature in GK for winnse_descend subroutine
   real(r_kind)            :: t_analytic                     !< for parameteric trajectories: initial time
   integer                 :: termination_criterion          !< condition to terminate the simulation ([0]=trajectory_file, 1=final_time, 2=final_temp, 3=final_dens, 4=neutron freeze-out)
@@ -139,10 +145,13 @@ module parameter_class
   real(r_kind)            :: gear_nr_eps                    !< Convergence criterion for the newton-raphson of the gear solver
   integer                 :: gear_nr_maxcount               !< Maximum newton-raphson iterations for gear solver
   integer                 :: gear_nr_mincount               !< Minimum newton-raphson iterations for gear solver
+  integer                 :: xtfc_nr_maxcount               !< Maximum newton-raphson iterations for X-TFC solver
+  integer                 :: xtfc_nr_mincount               !< Minimum newton-raphson iterations for X-TFC solver
   logical                 :: gear_ignore_adapt_stepsize     !< Flag whether gear should ignore the adapt stepsize loop
   logical                 :: timestep_traj_limit            !< Should the timestep be limited by the timestep of the trajectory
   logical                 :: use_htpf                       !< Use high temperature partition functions or not
   logical                 :: h_finab                        !< Store the finab in hdf5 format rather than in ascii format
+  logical                 :: save_network                   !< If solver is X-TFC, save or not the trained network for posteriori generalization outside trained time grid
   integer                 :: solver                         !< solver flag (0 - implicit Euler, 1 - Gear's method, ...), is integer as it is faster than comparing strings every timestep
   integer                 :: heating_mode                   !< Mode for heating: 0 - no heating, 1 - heating using an entropy equation, 2 - heating from the energy generation and trajectory changes
   integer                 :: screening_mode                 !< Mode for coulomb corrections: 0 - no screening, 1 - screening using the prescription of Kravchuk & Yakovlev 2014
@@ -183,6 +192,7 @@ module parameter_class
   character(max_fname_len):: Enux                           !< average Muon and Tauon neutrino energies [MeV]
   character(max_fname_len):: Enuxbar                        !< average Muon and Tauon antineutrino energies [MeV]
   character(max_fname_len):: prepared_network_path          !< Prepared network folder
+  logical                 :: use_sparse_solver              !< Use or not the sparse solver in the X-TFC method
 
 !>-- Newton-Raphson iterative loop parameters
   integer                  :: nr_maxcount             !< no more that this many iterations in NR
@@ -347,10 +357,12 @@ subroutine set_param(param_name,param_value)
       ":h_flow_every" // &
       ":h_engen_every" // &
       ":gear_nr_maxcount" // &
+      ":xtfc_nr_maxcount" // &
       ":iwinterp" // &
       ":heating_mode"//&
       ":nr_mincount" // &
       ":gear_nr_mincount" // &
+      ":xtfc_nr_mincount" // &
       ":alpha_decay_zmin" // &
       ":alpha_decay_zmax" // &
       ":nse_max_it" // &
@@ -358,7 +370,9 @@ subroutine set_param(param_name,param_value)
       ":nu_loss_every" // &
       ":h_nu_loss_every" // &
       ":interp_mode" // &
-      ":nse_solver"
+      ":nse_solver" // &
+      ":n_neurons" // &
+      ":n_x"
    character(*), parameter :: real_params =  &
       ":temp_reload_exp_weak_rates" // &
       ":engen"// &
@@ -385,11 +399,16 @@ subroutine set_param(param_name,param_value)
       ":freeze_rate_temp"// &
       ":nse_nr_tol"// &
       ":nse_delt_t9min" // &
-      ":heating_density"
+      ":heating_density" // &
+      ":w_i" // &
+      ":w_f" // &
+      ":x_i" // &
+      ":x_f"
    character(*), parameter :: logical_params =  &
       ":read_initial_composition" // &
       ":use_htpf" // &
       ":h_finab" // &
+      ":save_network" // &
       ":gear_ignore_adapt_stepsize" // &
       ":calc_nsep_energy" // &
       ":timestep_traj_limit" // &
@@ -405,7 +424,8 @@ subroutine set_param(param_name,param_value)
       ":alpha_decay_ignore_all"//&
       ":use_neutrino_loss_file" // &
       ":use_thermal_nu_loss"//&
-      ":use_prepared_network"
+      ":use_prepared_network" // &
+      ":use_sparse_solver"
    character(*), parameter :: string_params =  &
       ":trajectory_file" // &
       ":seed_file" // &
@@ -543,6 +563,10 @@ subroutine set_param(param_name,param_value)
      gear_nr_maxcount = read_integer_param(str_value,param_name)
    elseif(param_name.eq."gear_nr_mincount") then
      gear_nr_mincount = read_integer_param(str_value,param_name)
+   elseif(param_name.eq."xtfc_nr_maxcount") then
+     xtfc_nr_maxcount = read_integer_param(str_value,param_name)
+   elseif(param_name.eq."xtfc_nr_mincount") then
+     xtfc_nr_mincount = read_integer_param(str_value,param_name)
    elseif(param_name.eq."alpha_decay_zmin") then
      alpha_decay_zmin = read_integer_param(str_value,param_name)
    elseif(param_name.eq."alpha_decay_zmax") then
@@ -555,7 +579,10 @@ subroutine set_param(param_name,param_value)
      nu_loss_every = read_integer_param(str_value,param_name)
    elseif(param_name.eq."h_nu_loss_every") then
      h_nu_loss_every = read_integer_param(str_value,param_name)
-
+   elseif(param_name.eq."n_neurons") then
+     n_neurons = read_integer_param(str_value,param_name)
+   elseif(param_name.eq."n_x") then
+     n_x = read_integer_param(str_value,param_name)
 !--- real parameters
    elseif(param_name.eq."temp_reload_exp_weak_rates") then
      temp_reload_exp_weak_rates= read_float_param(str_value,param_name)
@@ -609,6 +636,14 @@ subroutine set_param(param_name,param_value)
      nr_tol= read_float_param(str_value,param_name)
    elseif(param_name.eq."freeze_rate_temp") then
      freeze_rate_temp= read_float_param(str_value,param_name)
+   elseif(param_name.eq."w_i") then
+     w_i= read_float_param(str_value,param_name)
+   elseif(param_name.eq."w_f") then
+     w_f= read_float_param(str_value,param_name)
+   elseif(param_name.eq."x_i") then
+     x_i= read_float_param(str_value,param_name)
+   elseif(param_name.eq."x_f") then
+     x_f= read_float_param(str_value,param_name)
 !--- logical type parameters
    elseif(param_name.eq."read_initial_composition") then
      read_initial_composition= lparam_value
@@ -626,6 +661,8 @@ subroutine set_param(param_name,param_value)
      use_htpf= lparam_value
    elseif(param_name.eq."h_finab") then
      h_finab= lparam_value
+   elseif(param_name.eq."save_network") then
+     save_network= lparam_value
    elseif(param_name.eq."use_timmes_mue") then
      use_timmes_mue= lparam_value
    elseif(param_name.eq."use_tabulated_rates") then
@@ -648,6 +685,8 @@ subroutine set_param(param_name,param_value)
      gear_ignore_adapt_stepsize= lparam_value
    elseif(param_name.eq."alpha_decay_ignore_all") then
      alpha_decay_ignore_all= lparam_value
+   elseif(param_name.eq."use_sparse_solver") then
+     use_sparse_solver= lparam_value
 !--- string parameters
    elseif(param_name.eq."trajectory_mode") then
      trajectory_mode= trim(str_value)
@@ -860,14 +899,21 @@ subroutine set_default_param
    gear_cFactor                = 0.25
    gear_nr_maxcount            = 10
    gear_nr_mincount            = 1
+   xtfc_nr_maxcount            = 10
+   xtfc_nr_mincount            = 3
    gear_nr_eps                 = 1.0d-6
    gear_ignore_adapt_stepsize  = .true.
    h_engen_detailed            = .false.
    h_flow_every                = 0
    h_finab                     = .false.
+   save_network                = .false.
    h_mainout_every             = 0
    heating_frac                = 0.4d0
    heating_density             = 1d11
+   w_i                         = -1d0
+   w_f                         = 1d0
+   x_i                         = 0d0
+   x_f                         = 1d0
    heating_mode                = 0
    htpf_file                   = "htpf.dat"
    initemp_cold                = 9.e0
@@ -953,6 +999,9 @@ subroutine set_default_param
    use_neutrino_loss_file      = .false.
    weak_rates_file             = "twr.dat"
    Ye_analytic                 = "0.1e0"
+   n_neurons                   = 2
+   n_x                         = 2
+   use_sparse_solver           = .true.
 
 end subroutine set_default_param
 
@@ -1007,10 +1056,13 @@ subroutine output_param
      write(ofile,'(A,es14.7)') 'gear_nr_eps                 ='  , gear_nr_eps
          write(ofile,'(A,I5)') 'gear_nr_maxcount            = ' , gear_nr_maxcount
          write(ofile,'(A,I5)') 'gear_nr_mincount            = ' , gear_nr_mincount
+         write(ofile,'(A,I5)') 'xtfc_nr_maxcount            = ' , xtfc_nr_maxcount
+         write(ofile,'(A,I5)') 'xtfc_nr_mincount            = ' , xtfc_nr_mincount
            write(ofile,'(2A)') 'h_custom_snapshots          = ' , yesno(h_custom_snapshots)
            write(ofile,'(2A)') 'h_engen_detailed            = ' , yesno(h_engen_detailed)
          write(ofile,'(A,I5)') 'h_engen_every               = ' , h_engen_every
            write(ofile,'(2A)') 'h_finab                     = ' , yesno(h_finab)
+           write(ofile,'(2A)') 'save_network                = ' , yesno(save_network)
          write(ofile,'(A,I5)') 'h_flow_every                = ' , h_flow_every
          write(ofile,'(A,I5)') 'h_mainout_every             = ' , h_mainout_every
          write(ofile,'(A,I5)') 'h_nu_loss_every             = ' , h_nu_loss_every
@@ -1018,6 +1070,10 @@ subroutine output_param
          write(ofile,'(A,I5)') 'h_track_nuclei_every        = ' , h_track_nuclei_every
          write(ofile,'(A,I5)') 'h_timescales_every          = ' , h_timescales_every
      write(ofile,'(A,es14.7)') 'heating_density             ='  , heating_density
+     write(ofile,'(A,es14.3)') 'w_i                         ='  , w_i
+     write(ofile,'(A,es14.3)') 'f_f                         ='  , w_f
+     write(ofile,'(A,es14.3)') 'x_i                         ='  , x_i
+     write(ofile,'(A,es14.3)') 'x_f                         ='  , x_f
      write(ofile,'(A,es14.7)') 'heating_frac                ='  , heating_frac
          write(ofile,'(A,I1)') 'heating_mode                = ' , heating_mode
            write(ofile,'(3A)') 'htpf_file                   = "', trim(htpf_file),'"'
@@ -1047,6 +1103,8 @@ subroutine output_param
          write(ofile,'(A,I5)') 'nse_max_it                  = ' , nse_max_it
      write(ofile,'(A,es14.7)') 'nse_nr_tol                  ='  , nse_nr_tol
          write(ofile,'(A,I5)') 'nse_solver                  = ' , nse_solver
+         write(ofile,'(A,I2)') 'n_neurons                   = ' , n_neurons
+         write(ofile,'(A,I2)') 'n_x                         = ' , n_x
            write(ofile,'(3A)') 'nsep_energies_file          = "', trim(nsep_energies_file),'"'
      write(ofile,'(A,es14.7)') 'nsetemp_cold                ='  , nsetemp_cold
      write(ofile,'(A,es14.7)') 'nsetemp_hot                 ='  , nsetemp_hot
@@ -1096,6 +1154,7 @@ subroutine output_param
            write(ofile,'(2A)') 'use_timmes_mue              = ' , yesno(use_timmes_mue)
            write(ofile,'(3A)') 'weak_rates_file             = "', trim(weak_rates_file),'"'
            write(ofile,'(3A)') 'Ye_analytic                 = "', trim(Ye_analytic),'"'
+           write(ofile,'(2A)') 'use_sparse_solver           = ' , yesno(use_sparse_solver)
 
      close(ofile)
   end if
@@ -1145,6 +1204,13 @@ subroutine check_param
       call raise_exception('The parameter "gear_nr_mincount" ('//trim(adjustl(int_to_str(gear_nr_mincount)))//&
                            ') should be smaller than "gear_nr_maxcount" ('//&
                            trim(adjustl(int_to_str(gear_nr_maxcount)))//').' ,&
+                           "check_param",340008)
+   end if
+
+   if (xtfc_nr_mincount .gt. xtfc_nr_maxcount) then
+      call raise_exception('The parameter "xtfc_nr_mincount" ('//trim(adjustl(int_to_str(xtfc_nr_mincount)))//&
+                           ') should be smaller than "xtfc_nr_maxcount" ('//&
+                           trim(adjustl(int_to_str(xtfc_nr_maxcount)))//').' ,&
                            "check_param",340008)
    end if
 

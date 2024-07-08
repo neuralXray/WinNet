@@ -64,6 +64,21 @@ p.set_usage("""
   Example: ./makerun.py -r test -p template.par""")
 
 
+def tail_out_until_pattern():
+    process = subprocess.Popen(['tail', '-n', '0', '-f', 'OUT'],
+                               stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    try:
+        for line in process.stdout:
+            print(line, end='')
+            if line.startswith("Elapsed time [s]:") | \
+               (line == " An error occured. Check 'ERR' file for further information.\n"):
+                break
+    except KeyboardInterrupt:
+        pass
+    finally:
+        process.kill()
+
+
 # Create an example case instance
 example = examplecase()
 
@@ -418,6 +433,8 @@ if not options.many_runs:
         ans = input("Do you want to monitor the simulation? (y/N)")
         if (ans=="" or ans=="n" or ans=="N" or ans=="No" or ans=="no"): sys.exit(0)
         os.system("tail -f OUT")
+    else:
+        tail_out_until_pattern()
 #--- multiple runs mode  ----------------------------------------------------
 else:
 

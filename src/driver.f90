@@ -23,6 +23,7 @@ program driver
   use network_init_module
   use timestep_module
   use analysis
+  use xtfc_module,         only: open_file
   implicit none
 
   integer                    :: cnt             !< Iteration count
@@ -82,6 +83,9 @@ program driver
 !
 
   cnt = 0
+  ! call open_file(.true., 'loss.txt', 0)
+  ! write(0, '((ES15.7,1X),(I5,1X),(ES15.7,1X))') 0d0, 0, 0d0
+  ! close(0)
   evolution_loop: do while (evolution_mode.ne.EM_TERMINATE)
 
      !-- Select timestep
@@ -94,8 +98,10 @@ program driver
         call advance_implicit_euler(cnt)
      case(1)  ! Gear's method
         call advance_gear(cnt)
+     case(2)  ! X-TFC method
+        call advance_xtfc(cnt)
      case default
-        call raise_exception("Invalid solver. Choose either solver = 1 or 2.","driver",&
+        call raise_exception("Invalid solver. Choose either solver = 0, 1, or 2.","driver",&
                              140003)
      end select
 
@@ -117,7 +123,6 @@ program driver
      T9h_p=  T9h
      cnt=    cnt+1
      time_p= time
-
 
   end do evolution_loop
 

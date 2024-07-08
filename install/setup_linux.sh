@@ -1,14 +1,14 @@
 #!/bin/bash
 # Author: M. Reichert
 # Date: 10.1.23
+# Updated: 14.11.23: Carlos Rábano
 
 echo "Script to setup WinNet on Linux with apt package manager."
-echo "This script is installing Anaconda (if not already installed), all necessary python package in a new environment called 'winnet', and the intel fortran compiler. Furthermore, your bashrc will be modified."
+echo "This script is installing all necessary python packages in a new venv called 'winnet',"
+echo "the Intel Fortran Compiler and the Intel oneAPI Math Kernel Library."
 echo "Use on your own risk!"
 while true; do
-
 read -p "Do you want to proceed? (y/n) " yn
-
 case $yn in
 	[yY] ) echo ok, we will proceed;
 		break;;
@@ -18,55 +18,45 @@ case $yn in
 esac
 done
 
-# Force typing sudo password for enable the installation with
-# sudo rights
-echo "Warning, this script will modify your bashrc!"
-echo "Type sudo password"
-sudo echo "---"
-# Check if conda exists, if not install it:
-if ! command -v conda &> /dev/null
-then
-  cd ~
 
-  wget https://repo.continuum.io/archive/Anaconda3-4.2.0-Linux-x86_64.sh
-  bash Anaconda3-4.2.0-Linux-x86_64.sh -b -p ~/anaconda
-  rm Anaconda3-4.2.0-Linux-x86_64.sh
-  cp ~/.bashrc ~/.bashrc_winnet_backup
-  echo 'export PATH="~/anaconda/bin:$PATH"' >> ~/.bashrc
-
-  source .bashrc
-
-  cd -
-fi
-
-# Create and activate an empty anaconda environment
-conda create -y --name winnet
-conda activate winnet
-# Install pip in this environment
-conda install -n winnet -y pip
-
+# Create and activate an empty venv
+echo ""
+echo "##############################"
+echo "python3 -m venv ../winnet"
+echo "##############################"
+echo ""
+python3 -m venv ../winnet
+echo ""
+echo "##############################"
+echo "source ../winnet/bin/activate"
+echo "##############################"
+echo ""
+source ../winnet/bin/activate
 # Now install all needed packages
-pip install -r requirements.txt
-
+echo ""
+echo "##############################"
+echo "python -m pip install -r requirements_tested.txt"
+echo "##############################"
+echo ""
+python -m pip install -r requirements.txt
 
 
 # If ifort does not exist install it
-if ! command -v ifort &> /dev/null
+if ! command -v ifx &> /dev/null
 then
-	wget https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB
-	sudo apt-key add GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB
-	rm GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB
-	sudo echo "deb https://apt.repos.intel.com/oneapi all main" | sudo tee /etc/apt/sources.list.d/oneAPI.list
-	sudo apt-get update
-	sudo apt-get install -y intel-oneapi-common-vars
-	sudo apt-get install -y intel-oneapi-compiler-fortran-2023.1.0
-	sudo apt-get install -y intel-oneapi-mkl-2023.1.0
+    wget -O- https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB | gpg --dearmor | sudo tee /usr/share/keyrings/oneapi-archive-keyring.gpg > /dev/null
+    echo "deb [signed-by=/usr/share/keyrings/oneapi-archive-keyring.gpg] https://apt.repos.intel.com/oneapi all main" | sudo tee /etc/apt/sources.list.d/oneAPI.list
+	sudo apt update
+	sudo apt install intel-oneapi-common-vars intel-oneapi-compiler-fortran intel-oneapi-mkl intel-oneapi-mkl-devel
 
-  # Source the compiler by default
-  echo 'source /opt/intel/oneapi/setvars.sh >/dev/null' >> ~/.bashrc
-  source ~/.bashrc
-  conda activate winnet
+    echo 'source /opt/intel/oneapi/setvars.sh' >> ~/.bashrc
+    source ~/.bashrc
+
 fi
+
+
+# echo 'export OMP_NUM_THREADS=1' >> ~/.bashrc
+
 
 # Say a bit more on the usage
 echo "---"
@@ -75,6 +65,7 @@ echo ""
 echo "Fully installed. Use the python environment 'winnet'."
 echo "Activate with:"
 echo ""
-echo "conda activate winnet"
+echo "source winnet/bin/activate"
 echo ""
 echo "before using the makerun.py"
+

@@ -9,7 +9,7 @@
 #>>> Path to Intel MKL library
 # If the compiler libraries were sourced before, the following
 # line can be an arbitrary path.
-MKL_DIR = /opt/intel/mkl
+MKL_DIR = /opt/intel/oneapi/mkl/latest
 
 #>>> Machine architecture
 ARCH = 64
@@ -36,7 +36,7 @@ LD = $(FC)
 FCCOM = $(notdir $(FC))
 
 # Get the git Version
-GIT_TAG:="$(shell git describe --abbrev=0 --tags)"
+GIT_TAG:="$(shell git describe --abbrev=0 --tags --always)"
 GIT_HASH:="$(shell git describe --abbrev=10 --always)"
 
 # Check if the compiler is able to deal with hdf5 files
@@ -78,7 +78,7 @@ ifeq ($(FCCOM),$(filter $(FCCOM),ifort ifx))
     #>>> Compiler flags: paranoid warning system
     # FFLAGS += -cpp -r8 -align -O0 -Warn all -fpe0 -check all -g -traceback -qopenmp -fp-stack-check -extend-source -heap-arrays -init=snan,arrays -DGHASH=$(GIT_HASH) -DGTAG=$(GIT_TAG)
     #>>> .. vs more relaxed version
-    FFLAGS   += -cpp -r8 -align -O3 -w -g -parallel -traceback -qopenmp -heap-arrays -DGHASH=$(GIT_HASH) -DGTAG=$(GIT_TAG)
+    FFLAGS   += -cpp -r8 -align -O3 -w -g -parallel -traceback -qopenmp -heap-arrays -DGHASH=$(GIT_HASH) -DGTAG=$(GIT_TAG) -diag-disable=10448  # -pg  # performance profile
 
     # Mac OS X user should further add -fp-stack-check -Wl,-stack_size,0x40000000,-stack_addr,0xf0000000
     # since the stack limit of mac can't be changed with ulimit -s unlimited. The above line will increase the stack limit to 1GB on Mac
@@ -176,6 +176,7 @@ SRCS += pardiso_class.f90
 SRCS += winnse_module.f90
 SRCS += parser_module.f90
 SRCS += single_zone_vars.f90
+SRCS += xtfc_module.f90
 SRCS += readini.f90
 SRCS += driver.f90
 
@@ -219,6 +220,7 @@ OBJS += jacobian_class.o
 OBJS += winnse_module.o
 OBJS += hydro_trajectory.o
 OBJS += single_zone_vars.o
+OBJS += xtfc_module.o
 OBJS += readini.o
 OBJS += driver.o
 
@@ -226,6 +228,7 @@ OBJS += driver.o
 TESTS  = neutron-decay
 TESTS += neutron-decay-implicit-euler
 TESTS += ni56-decay
+TESTS += ni56-decay_x-tfc
 TESTS += read_seeds
 TESTS += read_trajectory
 TESTS += gamma_eq
@@ -320,6 +323,7 @@ network_init_module.o            :\
    tw_rate_module.o \
    reaclib_rate_module.o \
    tabulated_rate_module.o \
+   xtfc_module.o \
    nuclear_heating.o \
    nucstuff_class.o \
    nuflux_class.o \
@@ -498,7 +502,8 @@ timestep_module.o                :\
    parser_module.o \
    nuclear_heating.o \
    readini.o \
-   jacobian_class.o
+   jacobian_class.o \
+   xtfc_module.o
 
 analysis.o                       :\
    parameter_class.o \
@@ -562,6 +567,14 @@ driver.o                 :\
    single_zone_vars.o \
    timestep_module.o
 
+xtfc_module.o            :\
+   global_class.o \
+   parameter_class.o \
+   single_zone_vars.o \
+   error_msg_class.o \
+   pardiso_class.o \
+   jacobian_class.o
+
 %.o: %.mod
 
 doc:
@@ -582,3 +595,4 @@ clean:
 	rm -rf $(BIN_PATH)/$(PROG) $(OBJS) $(OBJ_PATH)/*
 
 .PHONY: clean all doc tests
+

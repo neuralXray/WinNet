@@ -281,10 +281,10 @@ subroutine restrict_timestep(ctime,h,temp,dens,ttemp,tdens)
                if (ztime(i).gt.ctime) exit find_next_time
             enddo find_next_time
             tnext= ztime(i)
-            if ((ctime.lt.tnext).and.(ctime+h.gt.tnext)) then
+            !if ((ctime.lt.tnext).and.(ctime+h.gt.tnext)) then
                ! To ensure that the timestep is not to small
                h = max(tnext-ctime,1e-15)
-            end if
+            !end if
          endif
    endif
 
@@ -362,7 +362,7 @@ end function ye_timestep
 !! \b Created: OK 28.08.2017
 !!
 function abchange_timestep(h,Y,dYdt)
-use parameter_class, only: timestep_factor,timestep_Ymin
+use parameter_class, only: timestep_factor,timestep_Ymin,solver,n_x
 use global_class, only: net_size
 implicit none
 real(r_kind):: abchange_timestep
@@ -377,10 +377,11 @@ real(r_kind):: h1
    do i = 1, net_size
       if (Y(i) .le. timestep_Ymin) cycle
       if (dYdt(i) .eq. 0.d0) cycle
-      if (dYdt(i)*h1 .gt. abs(Y(i))*timestep_factor) then
-         h1= timestep_factor * abs(Y(i)/dYdt(i))
+      if (dabs(dYdt(i)*h1) .gt. dabs(Y(i))*timestep_factor) then
+         h1= timestep_factor * dabs(Y(i)/dYdt(i))
       endif
    end do
+   ! if (solver .eq. 2) h1 = h1 * (n_x - 1)
    abchange_timestep= h1
 
 end function abchange_timestep
@@ -505,11 +506,13 @@ logical, intent(inout):: init
 
       ! adjust the stepsize
       stepsize= initial_stepsize
-   endif
+      call el_ab (Y, Ye)
+      init = .false.
+   else
 
-   call el_ab (Y, Ye)
-   call timestep (time,T9,rhob,ent,Y,dYdt,Ye,Ye-Ye_p,stepsize,evolution_mode)
-   init = .false.
+      call el_ab (Y, Ye)
+      call timestep (time,T9,rhob,ent,Y,dYdt,Ye,Ye-Ye_p,stepsize,evolution_mode)
+   endif
 
 end subroutine select_optimistic_timestep
 
@@ -723,9 +726,9 @@ real(r_kind)           :: T9_nrlast    !< Last temperature of the NR
          ! exit if mass is conserved sufficiently well
          if (((.not. heating_switch) .and. (nr_count.ge.nr_mincount) .and. (dabs(m_tot-1d0).lt.nr_tol)) .or. &
              ((heating_switch) .and. (nr_count.ge.nr_mincount) .and. (dabs(m_tot-1d0).lt.nr_tol)  .and. &
-              ((max(T9_nrlast,T9)/min(T9_nrlast,T9)-1 .lt. timestep_hydro_factor))) .or. &
+              (((max(T9_nrlast,T9)/min(T9_nrlast,T9)-1) .lt. timestep_hydro_factor))) .or. &
               ((heating_switch) .and. (nr_count.ge.nr_mincount) .and. (dabs(m_tot-1d0).lt.nr_tol) .and. &
-               k .eq. adapt_stepsize_maxcount)) &
+               (k .eq. adapt_stepsize_maxcount))) &
               exit newton_raphson
 
 
@@ -738,7 +741,7 @@ real(r_kind)           :: T9_nrlast    !< Last temperature of the NR
       if (heating_switch) then
         ! Dont be too strict in the last adapt stepsize iteration
         if (k .ne. adapt_stepsize_maxcount) then
-         exit_condition = exit_condition .and. (max(T9,T9_p)/min(T9,T9_p)-1 .lt. timestep_hydro_factor)
+         exit_condition = exit_condition .and. ((max(T9,T9_p)/min(T9,T9_p)-1) .lt. timestep_hydro_factor)
         end if
       end if
       if (exit_condition) exit adapt_stepsize
@@ -819,7 +822,7 @@ end subroutine advance_implicit_euler
 !!       -  MR 22.12.2020
 !! .
 subroutine advance_gear(cnt)
-use parameter_class, only: heating_mode,nse_calc_every, &
+use parameter_class, only: nse_calc_every, &
                            trajectory_mode, gear_nr_eps, gear_escale, &
                            gear_nr_maxcount, freeze_rate_temp, &
                            initial_stepsize, adapt_stepsize_maxcount,&
@@ -935,7 +938,7 @@ real(r_kind)           :: T9_nrlast     !< Last temperature in NR
                 dabs(m_tot-1.0d0).lt.gear_nr_eps .and. gear_nr_count .ge. gear_nr_mincount) .or. &
                 (heating_switch .and. maxval(dabs(delta)/max(Y,gear_escale)).lt.gear_nr_eps .and. &
                 dabs(m_tot-1.0d0).lt.gear_nr_eps .and. gear_nr_count .ge. gear_nr_mincount .and.&
-                ((max(T9_nrlast,T9)/min(T9_nrlast,T9)-1 .lt. timestep_hydro_factor))) .or. &
+                (((max(T9_nrlast,T9)/min(T9_nrlast,T9)-1) .lt. timestep_hydro_factor))) .or. &
                  ((heating_switch) .and. maxval(dabs(delta)/max(Y,gear_escale)).lt.gear_nr_eps .and. &
                  dabs(m_tot-1.0d0).lt.gear_nr_eps .and. &
                  (k .eq. adapt_stepsize_maxcount))) then
@@ -955,7 +958,7 @@ real(r_kind)           :: T9_nrlast     !< Last temperature in NR
             if (heating_switch) then
             ! Dont be too strict in the last adapt stepsize iteration
                 if (k .ne. adapt_stepsize_maxcount) then
-                    exit_condition = exit_condition .and. (max(T9,T9_p)/min(T9,T9_p)-1 .lt. timestep_hydro_factor)
+                    exit_condition = exit_condition .and. ((max(T9,T9_p)/min(T9,T9_p)-1) .lt. timestep_hydro_factor)
                 end if
             end if
             if (exit_condition) exit adapt_stepsize
@@ -1030,5 +1033,246 @@ real(r_kind)           :: T9_nrlast     !< Last temperature in NR
    call prepare_next_step
 
 end subroutine advance_gear
+
+
+!>
+!! Advance system to the next step for the X-TFC method
+!!
+!! .
+subroutine advance_xtfc(cnt)
+    use parameter_class,  only: nse_calc_every, trajectory_mode, freeze_rate_temp, &
+                                timestep_hydro_factor, initial_stepsize, &
+                                adapt_stepsize_maxcount, xtfc_nr_mincount, xtfc_nr_maxcount, nr_tol, &
+                                n_neurons, n_x, x_i, x_f, save_network, use_sparse_solver, timestep_Ymin
+    use global_class,     only: net_size, isotope, ipro, ineu, heating_switch
+    use hydro_trajectory, only: zsteps, ztime
+    use analysis,         only: output_nr_diagnostic
+    use winnse_module,    only: pf, winnse_guess
+    use nucstuff_class,   only: el_ab, masscalc
+    use nuclear_heating,  only: nuclear_heating_update
+    use ls_timmes_eos_module, only: timmes_eos_state, timmes_eos, ink
+    use error_msg_class, only: num_to_str
+    use single_zone_vars
+    use xtfc_module, only: g, gd, jacobi_xtfc, jacobi_xtfc_sparse, &
+                           least_squares, least_squares_sparse, save_network_beta, open_file, open_file
+    use jacobian_class, only: abchange
+    use, intrinsic :: ieee_arithmetic
+    implicit none
+    integer, intent(in)    :: cnt !< global iteration counter
+    !
+    integer                :: k              !< Current iteration of adapt stepsize
+    integer                :: xtfc_count     !< Current iteration of the newton-raphson
+    real(r_kind)           :: m_tot          !< Mass conservation
+    real(r_kind)           :: m_con_dev      !< Mass conservation deviation
+    type(timmes_eos_state) :: state          !< State variable for Helmholtz EOS
+    integer                :: eos_status     !< Status of the eos, 0=working, 0!=failing
+    logical                :: exit_condition !< Helper variable that keeps track of the exit condition of the NR
+    real(r_kind)           :: T9_nrlast      !< Last temperature of the NR
+    !
+    real(r_kind) :: c
+    real(r_kind) :: Yi(n_x, net_size)
+    real(r_kind) :: ydoti(n_x, net_size)
+    real(r_kind) :: ydoti_xtfc(n_x, net_size)
+    real(r_kind) :: Loss(n_x, net_size)
+    real(r_kind) :: beta(n_neurons, net_size)
+    integer      :: i, j
+    ! Check the mass conservation and kill the calculation if something goes odd.
+    ! Mass conservation should not be within 0.001% to nr_tol
+    ! simulataneously with a small timestep.
+    ! Note: Other networks such as SkyNet rescale the abundances at this point.
+    call masscalc(Y_p, m_tot)
+    if ((1.00001*dabs(m_tot-1d0) .ge. nr_tol) .and. (stepsize .le. 1e-15)) then
+      call raise_exception("The result did not converge properly. "//NEW_LINE("A")//&
+                           "Mass conservation was "//num_to_str(dabs(m_tot-1d0))//"."//NEW_LINE("A")//&
+                           "Stepsize was "//num_to_str(stepsize)//"s."//NEW_LINE("A")//&
+                           "This error could be a result of inconsistent reaction rates, "//NEW_LINE("A")//&
+                           "if this is not the case,"//&
+                           "try to use different values of nr_tol, xtfc_nr_maxcount, or timestep_factor.",&
+                           'advance_xtfc',430011)
+    end if
+
+
+    adapt_stepsize: do k = 0, adapt_stepsize_maxcount
+        ! compute some handy reductions and auxiliary variables
+        Y    = Y_p
+        Rkm  = Rkm_p
+        time = time_p + stepsize
+        ent  = ent_p
+        T9   = T9_p
+
+        call el_ab (Y, Ye)
+        ! Get temperature, density, and radius
+        call update_hydro(time, T9, rhob, Rkm, ent, Ye, T9h)
+
+        ! Set an initial value to the last temperature of the NR
+        T9_nrlast = T9
+
+        beta = 0
+        c = (x_f - x_i) / stepsize
+
+        Yi = matmul(g, beta)
+        ydoti_xtfc = c*matmul(gd, beta)
+        do i = 1, n_x
+            Yi(i, :) = Yi(i, :) + Y_p
+        end do
+
+        if (use_sparse_solver) then
+            call jacobi_xtfc_sparse(Yi, ydoti, c)
+        else
+            call jacobi_xtfc(Yi, ydoti, c)
+        end if
+        Loss = ydoti_xtfc - ydoti
+
+        ! call open_file(.false., 'loss.txt', 0)
+        ! write(0, '((ES15.7,1X),(I5,1X),(ES15.7,1X))') time, 0, sum(abs(Loss))
+        ! close(0)
+
+        newton_raphson: do xtfc_count = 1, xtfc_nr_maxcount
+            exit_condition = .True.
+
+            if (use_sparse_solver) then
+                call least_squares_sparse(reshape(Loss, [n_x * net_size]), beta)
+            else
+                call least_squares(reshape(Loss, [n_x * net_size]), beta)
+            end if
+
+            Yi = matmul(g, beta)
+            ydoti_xtfc = c*matmul(gd, beta)
+            m_con_dev = 0
+            do i = 1, n_x
+                Yi(i, :) = Yi(i, :) + Y_p
+                !call abchange(time, T9*1e9, rhob, Ye, Rkm, Yi(i, :), ydoti(i, :), evolution_mode)
+
+                ! thermodynamics update
+                call el_ab(Yi(i, :), Ye)
+                ! Check if thinks are reasonable or
+                ! went terribly wrong
+                !if ((Ye .lt. 0) .or. (Ye .gt. 1)) then
+                if (Ye .lt. 0) then
+                    if (VERBOSE_LEVEL .gt. 1) then
+                        write(*,*) "Ye is negative, obtained Ye = "//num_to_str(Ye)
+                    end if
+                    exit_condition = .False.
+                    exit newton_raphson
+                end if
+
+                ! mass conservation check
+                call masscalc(Yi(i, :), m_tot)
+                if (dabs(m_tot - 1d0) .gt. m_con_dev) m_con_dev = dabs(m_tot - 1d0)
+            end do
+            Y = Yi(n_x, :)
+
+            if (use_sparse_solver) then
+                call jacobi_xtfc_sparse(Yi, ydoti, c)
+            else
+                call jacobi_xtfc(Yi, ydoti, c)
+            end if
+            Loss = ydoti_xtfc - ydoti
+
+            ! call open_file(.false., 'loss.txt', 0)
+            ! write(0, '((ES15.7,1X),(I5,1X),(ES15.7,1X))') time, xtfc_count, sum(abs(Loss))
+            ! close(0)
+
+            if (heating_switch) then
+               ! Update NSE if heating is turned on
+               if (evolution_mode .eq. EM_NSE) then
+                   call winnse_guess( T9, rhob, Ye, Y(ineu), Y(ipro), Y)
+               end if
+               ! update entropy from nuclear heating, then update temperature
+               call nuclear_heating_update(xtfc_count,rhob,Ye,pf,Y_p,Y,ent_p,ent,T9_p,T9,T9h_p,T9h,stepsize)
+            end if
+
+            ! periodic output
+            call output_nr_diagnostic(cnt,k,xtfc_count,time,T9,stepsize,m_tot,Y_p,Y)
+
+            ! exit if dabs(m_tot - 1d0) .lt. nr_tol
+            if (((.not. heating_switch) .and. (xtfc_count .ge. xtfc_nr_mincount) .and. (m_con_dev .lt. nr_tol)) .or. &
+               ((heating_switch) .and. (xtfc_count .ge. xtfc_nr_mincount) .and. (m_con_dev .lt. nr_tol) .and. &
+                ((max(T9_nrlast, T9) / min(T9_nrlast, T9) - 1) .lt. timestep_hydro_factor)) .or. &
+               ((heating_switch) .and. (xtfc_count .ge. xtfc_nr_mincount) .and. (m_con_dev .lt. nr_tol) .and. &
+                (k .eq. adapt_stepsize_maxcount))) &
+                exit newton_raphson
+
+            T9_nrlast = T9
+        end do newton_raphson
+
+        ! See if one has to repeat the timestep
+        exit_condition = exit_condition .and. (xtfc_count .le. xtfc_nr_maxcount)
+        if (heating_switch) then
+            ! Dont be too strict in the last adapt stepsize iteration
+            if (k .ne. adapt_stepsize_maxcount) then
+                exit_condition = exit_condition .and. ((max(T9, T9_p) / min(T9, T9_p) - 1) .lt. timestep_hydro_factor)
+            end if
+        end if
+        if (exit_condition) exit adapt_stepsize
+
+        ! Check if the maxcount is reached and try one last time
+        ! to get it to convergence
+        if (timestep_Ymin .ne. 1) then
+            if (k .eq. adapt_stepsize_maxcount) then
+                stepsize = max(initial_stepsize, 1e-3 * stepsize)
+            else
+                stepsize = 0.5 * stepsize
+            end if
+        end if
+    end do adapt_stepsize
+
+    if (save_network) then
+        if (time_p .eq. 0) then
+            call save_network_beta(stepsize, beta, .true.)
+        else
+            call save_network_beta(stepsize, beta, .false.)
+        end if
+    end if
+
+
+    ! Update entropy
+    if (.not. (heating_switch)) then
+       if (trim(adjustl(trajectory_mode)) .eq. "from_file") then
+          if (time.le.ztime(zsteps) .and. (T9 .gt. freeze_rate_temp*1.0000001)) then
+             ! update entropy using the temperature
+             state%abar = sum(Y(1:net_size)*isotope(1:net_size)%mass) &
+                        / sum(Y(1:net_size))
+             call timmes_eos(ink,T9*1.d9,rhob,Ye,state,eos_status)
+             if(eos_status.ne.0) call raise_exception("An error occured in the EOS.",&
+                                                      'advance_xtfc',430009)
+             ent = state%s
+          else
+             ! adiabatic expansion
+             ent = ent_p
+          end if
+       else if (trim(adjustl(trajectory_mode)) .eq. "analytic") then
+          if (T9 .gt. freeze_rate_temp*1.0000001) then
+            ! update entropy using the temperature
+            state%abar = sum(Y(1:net_size)*isotope(1:net_size)%mass) &
+                       / sum(Y(1:net_size))
+            call timmes_eos(ink,T9*1.d9,rhob,Ye,state,eos_status)
+            if(eos_status.ne.0) call raise_exception("An error occured in the EOS.",&
+                                                      'advance_xtfc',430009)
+            ent = state%s
+          end if
+       end if
+    end if
+
+
+    ! if still not converged, complain and exit
+    if (k.gt.adapt_stepsize_maxcount) then
+       call raise_exception("Max. number of steps reached. Probably try to change "//NEW_LINE('A')//&
+                            'the "adapt_stepsize_maxcount", "xtfc_nr_maxcount", or "nr_tol" parameter.',&
+                            'advance_xtfc',430010)
+    end if
+
+    ! Update NSE abundances, only in NSE evolution mode
+    if (evolution_mode .eq. EM_NSE) then
+       ! Update at all?
+       if (nse_calc_every .ne. 0) then
+          ! Update every nse_calc_step
+          if (modulo(cnt,nse_calc_every) .eq. 0) then
+             call winnse_guess( T9, rhob, Ye, Y(ineu), Y(ipro), Y)
+          end if
+       end if
+    end if
+
+end subroutine advance_xtfc
 
 end module timestep_module
